@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CMC Farming — Transfers &amp; Bank Balances</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;font-size:14px;background:#f4f4f2;color:#1a1a1a;padding:24px}
+h1{font-size:18px;font-weight:500;margin-bottom:2px}
+.subhead{font-size:12px;color:#666;margin-bottom:20px}
+.card{background:#fff;border:1px solid #e5e5e0;border-radius:12px;padding:16px 20px;margin-bottom:16px}
+.card-title{font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.stat{background:#f4f4f2;border-radius:8px;padding:8px 12px}
+.stat-label{font-size:11px;color:#888;margin-bottom:2px}
+.stat-val{font-size:15px;font-weight:500}
+.stat-val.warn{color:#854F0B}
+.stat-val.ok{color:#0F6E56}
+.flags-bar{display:flex;align-items:center;gap:8px;background:#f4f4f2;border-radius:8px;padding:7px 12px;margin-bottom:12px;font-size:12px}
+.flags-label{color:#888}
+.flags-val{font-weight:500}
+.flags-val.warn{color:#854F0B}
+.flags-val.ok{color:#0F6E56}
+.section-label{font-size:12px;font-weight:500;display:flex;align-items:center;gap:8px;margin-bottom:.5rem}
+.section-label span{flex:1;height:1px}
+table.ledger{width:100%;border-collapse:collapse;table-layout:fixed}
+table.ledger th{font-size:11px;font-weight:600;color:#888;text-align:left;padding:5px 6px;border-bottom:1px solid #e5e5e0}
+table.ledger td{padding:3px 4px;border-bottom:1px solid #f0f0ec;vertical-align:middle}
+table.ledger tbody tr:last-child td{border-bottom:none}
+select.sm{font-size:12px;padding:3px 5px;height:28px;width:100%;border-radius:6px;background:#f4f4f2;border:1px solid #e0e0db;color:#1a1a1a}
+select.sm:focus{outline:none;border-color:#1D9E75}
+input.amt-field{font-size:13px;padding:3px 8px;height:28px;width:100%;border-radius:6px;background:#f4f4f2;border:1px solid #e0e0db;color:#1a1a1a;text-align:right;font-family:inherit}
+input.amt-field:focus{outline:none;border-color:#1D9E75;box-shadow:0 0 0 2px rgba(29,158,117,.15)}
+input.amt-field::placeholder{color:#bbb;font-size:12px}
+input.note-field{font-size:12px;padding:3px 5px;height:28px;width:100%;border-radius:6px;background:#f4f4f2;border:1px solid #e0e0db;color:#1a1a1a}
+input.note-field:focus{outline:none;border-color:#1D9E75}
+.del-btn{width:22px;height:22px;border-radius:4px;border:1px solid #ddd;background:transparent;color:#bbb;cursor:pointer;font-size:13px;line-height:1}
+.del-btn:hover{background:#fff0f0;color:#c00;border-color:#f09595}
+.add-row-btn{font-size:12px;color:#999;background:transparent;border:1px dashed #ccc;border-radius:8px;padding:5px;width:100%;cursor:pointer;margin-top:6px}
+.add-row-btn:hover{background:#f4f4f2;color:#1a1a1a}
+.row-num{font-size:11px;color:#bbb;text-align:center}
+.warn-row td{background:#fef3e2}
+.dep-row td{background:#edfaf4}
+.wd-row td{background:#fff0f0}
+.export-bar{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid #f0f0ec;align-items:center}
+.exp-btn{font-size:12px;padding:5px 12px;border-radius:8px;border:1px solid #ddd;background:#fff;color:#1a1a1a;cursor:pointer;display:flex;align-items:center;gap:5px}
+.exp-btn:hover{background:#f4f4f2}
+.exp-btn svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.exp-label{font-size:11px;color:#888;margin-right:2px}
+.exp-divider{color:#ccc;font-size:13px;margin:0 2px}
+.upload-zone{border:1.5px dashed #ccc;border-radius:12px;padding:2.5rem;text-align:center;cursor:pointer;background:#fafaf8;transition:all .15s}
+.upload-zone:hover,.upload-zone.dragover{border-color:#1D9E75;background:#f0faf5}
+.upload-icon{width:30px;height:30px;stroke:#aaa;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;margin-bottom:12px}
+.upload-label{font-size:13px;color:#666}
+.upload-label strong{color:#1a1a1a;font-weight:500}
+.upload-sub{font-size:11px;color:#aaa;margin-top:5px}
+.loaded-bar{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:#e8f7f1;border:1px solid #5DCAA5;border-radius:8px;margin-bottom:14px;font-size:12px;color:#085041}
+.loaded-bar button{font-size:11px;background:#fff;border:1px solid #5DCAA5;border-radius:4px;color:#085041;padding:2px 10px;cursor:pointer}
+.loaded-bar button:hover{background:#e8f7f1}
+.toast{position:fixed;bottom:24px;right:24px;background:#1D9E75;color:#fff;font-size:13px;font-weight:500;padding:8px 18px;border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:999}
+.toast.show{opacity:1}
+.flag{display:inline-block;width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.flag.ok{background:#1D9E75}
+.flag.bad{background:#E24B4A}
+.flag.zba{background:#EF9F27}
+.bal-orig{font-size:10px;color:#999;text-align:right;white-space:nowrap}
+.bal-proj{font-size:11px;font-weight:600;text-align:right;white-space:nowrap}
+.bal-proj.ok{color:#0F6E56}
+.bal-proj.bad{color:#A32D2D}
+.bal-proj.zba-proj{color:#854F0B}
+.save-indicator{font-size:11px;display:flex;align-items:center;gap:5px}
+.save-indicator.saved{color:#0F6E56}
+.save-indicator.saving{color:#854F0B}
+.save-indicator.error{color:#c00}
+.spinner{width:11px;height:11px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.history-btn{font-size:12px;padding:5px 12px;border-radius:8px;border:1px solid #ddd;background:#fff;color:#666;cursor:pointer}
+.history-btn:hover{background:#f4f4f2}
+.history-panel{background:#f9f9f7;border:1px solid #e5e5e0;border-radius:8px;padding:12px;margin-bottom:16px}
+.history-item{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-bottom:1px solid #eee;font-size:12px;cursor:pointer;border-radius:6px}
+.history-item:last-child{border-bottom:none}
+.history-item:hover{background:#f0f0ec}
+.history-date{font-weight:500;color:#1a1a1a}
+.history-meta{color:#888;font-size:11px}
+#file-input{display:none}
+</style>
+</head>
+<body>
+
+<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:2px">
+  <h1>CMC Farming — Transfers &amp; Bank Balances</h1>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span class="save-indicator" id="save-indicator"></span>
+    <button class="history-btn" onclick="toggleHistory()" id="history-btn">View history</button>
+  </div>
+</div>
+<p class="subhead" id="date-line"></p>
+<div id="toast" class="toast"></div>
+<div id="history-wrap" style="display:none"></div>
+
+<div id="upload-section" style="display:none">
+  <div class="card">
+    <div class="card-title">Load today's balances</div>
+    <div class="upload-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <svg class="upload-icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+      <div class="upload-label"><strong>Click to upload</strong> or drag and drop your Daily Bank Balances file</div>
+      <div class="upload-sub">Excel (.xlsx or .xls) &nbsp;·&nbsp; Column A: account name &nbsp;·&nbsp; Column C: balance</div>
+    </div>
+    <input type="file" id="file-input" accept=".xlsx,.xls" onchange="handleFile(this.files[0])">
+    <div id="upload-error" style="display:none;font-size:12px;color:#c00;margin-top:8px;padding:6px 10px;background:#fff0f0;border-radius:6px;border:1px solid #f09595"></div>
+  </div>
+</div>
+
+<div id="main-section" style="display:none">
+  <div id="loaded-bar-wrap"></div>
+  <div class="card">
+    <div class="stats">
+      <div class="stat"><div class="stat-label">Transfers</div><div class="stat-val" id="s-count">0</div></div>
+      <div class="stat"><div class="stat-label">Transferred</div><div class="stat-val" id="s-total">$0</div></div>
+      <div class="stat"><div class="stat-label">Deposits</div><div class="stat-val ok" id="s-deps">$0</div></div>
+      <div class="stat"><div class="stat-label">Withdrawals</div><div class="stat-val warn" id="s-wds">$0</div></div>
+    </div>
+    <div class="flags-bar">
+      <span class="flags-label">Flagged accounts:</span>
+      <span class="flags-val ok" id="s-flags">0</span>
+    </div>
+
+    <div class="section-label" style="color:#0F6E56"><span style="background:#9FE1CB;height:1px;flex:1;display:inline-block"></span>Transfers<span style="background:#9FE1CB;height:1px;flex:1;display:inline-block"></span></div>
+    <table class="ledger">
+      <thead><tr>
+        <th style="width:26px">#</th>
+        <th style="width:30%">From</th>
+        <th style="width:30%">To</th>
+        <th style="width:17%">Amount</th>
+        <th style="width:17%">Note</th>
+        <th style="width:24px"></th>
+      </tr></thead>
+      <tbody id="transfer-body"></tbody>
+    </table>
+    <button class="add-row-btn" onclick="addTransfer()">+ add transfer</button>
+
+    <div class="section-label" style="color:#185FA5;margin-top:1.25rem"><span style="background:#B5D4F4;height:1px;flex:1;display:inline-block"></span>Deposits &amp; withdrawals<span style="background:#B5D4F4;height:1px;flex:1;display:inline-block"></span></div>
+    <table class="ledger">
+      <thead><tr>
+        <th style="width:26px">#</th>
+        <th style="width:28%">Account</th>
+        <th style="width:16%">Type</th>
+        <th style="width:17%">Amount</th>
+        <th style="width:17%">Note</th>
+        <th style="width:24px"></th>
+      </tr></thead>
+      <tbody id="dw-body"></tbody>
+    </table>
+    <button class="add-row-btn" onclick="addDW()">+ add deposit / withdrawal</button>
+
+    <div class="export-bar">
+      <span class="exp-label">Transfers:</span>
+      <button class="exp-btn" onclick="exportCSV()"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>CSV</button>
+      <button class="exp-btn" onclick="copyClipboard()"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>Copy</button>
+      <button class="exp-btn" onclick="printTransfers()"><svg viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print</button>
+      <span class="exp-divider">|</span>
+      <span class="exp-label">Full report:</span>
+      <button class="exp-btn" onclick="exportSummary()"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>Copy</button>
+      <button class="exp-btn" onclick="printView()"><svg viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Running balances</div>
+    <div id="bal-panel"></div>
+  </div>
+</div>
+
+<script>
+const AT_TOKEN='patNgkVD5XUGZFJPV.f31b518f4b175fa64580d93563dc8ca34b68a9145c8926e715abccddb0db2aa7';
+const AT_BASE='appCYmz92VELK1qDu';
+const AT_URL=`https://api.airtable.com/v0/${AT_BASE}`;
+
+const ZBA={
+  'CBB Crop PR':'CBB Crop Gen',
+  'CBB Crop AP':'CBB Crop Gen',
+  'CBB JMFS PR':'CBB JMFS Gen',
+  'CBB CMC Propane PR':'CBB CMC Propane Gen'
+};
+
+let ACCTS=[],BALS={},transfers=[],dwRows=[],nextTid=1,nextDid=1;
+let sessionRecordId=null,saveTimer=null;
+
+document.getElementById('date-line').textContent=new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+function atHeaders(){return{'Authorization':'Bearer '+AT_TOKEN,'Content-Type':'application/json'};}
+
+async function atGet(table,params=''){
+  const r=await fetch(`${AT_URL}/${encodeURIComponent(table)}${params}`,{headers:atHeaders()});
+  return r.json();
+}
+async function atPost(table,fields){
+  const r=await fetch(`${AT_URL}/${encodeURIComponent(table)}`,{method:'POST',headers:atHeaders(),body:JSON.stringify({fields})});
+  return r.json();
+}
+async function atPatch(table,id,fields){
+  const r=await fetch(`${AT_URL}/${encodeURIComponent(table)}/${id}`,{method:'PATCH',headers:atHeaders(),body:JSON.stringify({fields})});
+  return r.json();
+}
+
+const dropZone=document.getElementById('drop-zone');
+dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('dragover');});
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('dragover');const f=e.dataTransfer.files[0];if(f)handleFile(f);});
+
+function handleFile(file){
+  if(!file)return;
+  const errEl=document.getElementById('upload-error');errEl.style.display='none';
+  const reader=new FileReader();
+  reader.onload=async function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      const na=[],nb={};
+      data.forEach(row=>{
+        const name=String(row[0]||'').trim();
+        const bal=parseFloat(row[2]);
+        if(name&&!isNaN(bal)){na.push(name);nb[name]=bal;}
+      });
+      if(!na.length){errEl.textContent='No valid rows found. Check column A = account name, column C = balance.';errEl.style.display='block';return;}
+      ACCTS=na;BALS=nb;transfers=[];dwRows=[];nextTid=1;nextDid=1;
+      document.getElementById('transfer-body').innerHTML='';
+      document.getElementById('dw-body').innerHTML='';
+      document.getElementById('upload-section').style.display='none';
+      document.getElementById('main-section').style.display='block';
+      document.getElementById('loaded-bar-wrap').innerHTML=`<div class="loaded-bar"><span>Loaded <strong>${ACCTS.length} accounts</strong> from ${file.name}</span><button onclick="resetUpload()">Change file</button></div>`;
+      recalc();
+      if(transfers.length===0)addTransfer();
+    }catch(err){errEl.textContent='Could not read file. Please use a valid .xlsx or .xls file.';errEl.style.display='block';}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function resetUpload(){
+  ACCTS=[];BALS={};transfers=[];dwRows=[];nextTid=1;nextDid=1;sessionRecordId=null;
+  document.getElementById('transfer-body').innerHTML='';
+  document.getElementById('dw-body').innerHTML='';
+  document.getElementById('upload-section').style.display='block';
+  document.getElementById('main-section').style.display='none';
+  document.getElementById('file-input').value='';
+}
+
+function todayStr(){return new Date().toISOString().slice(0,10);}
+
+async function loadSession(){
+  setSaveIndicator('saving');
+  try{
+    const today=todayStr();
+    const d=await atGet('Sessions',`?filterByFormula=AND({Date}='${today}',NOT({ClosedOut}))&maxRecords=1`);
+    if(d.records&&d.records.length>0){
+      const rec=d.records[0];
+      sessionRecordId=rec.id;
+      try{transfers=JSON.parse(rec.fields.Transfers||'[]');}catch(e){transfers=[];}
+      try{dwRows=JSON.parse(rec.fields.DepositsWithdrawals||'[]');}catch(e){dwRows=[];}
+      nextTid=transfers.length>0?Math.max(...transfers.map(r=>r.id))+1:1;
+      nextDid=dwRows.length>0?Math.max(...dwRows.map(r=>r.id))+1:1;
+      transfers.forEach((r,i)=>renderTransferRow(r,i+1));
+      dwRows.forEach((r,i)=>renderDWRow(r,i+1));
+      recalc();
+      if(transfers.length>0||dwRows.length>0)showToast('Session restored — '+transfers.length+' transfers, '+dwRows.length+' deposits/withdrawals');
+    }
+    setSaveIndicator('');
+  }catch(e){setSaveIndicator('error');}
+}
+
+function scheduleSave(){
+  setSaveIndicator('saving');
+  if(saveTimer)clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>saveSession(),1500);
+}
+
+async function saveSession(){
+  const today=todayStr();
+  const fields={
+    Date:today,
+    Transfers:JSON.stringify(transfers),
+    DepositsWithdrawals:JSON.stringify(dwRows),
+    Balances:JSON.stringify(BALS),
+    Accounts:JSON.stringify(ACCTS),
+    ClosedOut:false
+  };
+  try{
+    if(sessionRecordId){
+      await atPatch('Sessions',sessionRecordId,fields);
+    } else {
+      const d=await atPost('Sessions',fields);
+      sessionRecordId=d.id;
+    }
+    setSaveIndicator('saved');
+    setTimeout(()=>setSaveIndicator(''),3000);
+  }catch(e){setSaveIndicator('error');}
+}
+
+function setSaveIndicator(state){
+  const el=document.getElementById('save-indicator');
+  if(state==='saving'){el.className='save-indicator saving';el.innerHTML='<div class="spinner"></div> Saving...';}
+  else if(state==='saved'){el.className='save-indicator saved';el.textContent='Saved';}
+  else if(state==='error'){el.className='save-indicator error';el.textContent='Save failed';}
+  else{el.className='save-indicator';el.textContent='';}
+}
+
+async function toggleHistory(){
+  const wrap=document.getElementById('history-wrap');
+  const btn=document.getElementById('history-btn');
+  if(wrap.style.display!=='none'){wrap.style.display='none';btn.textContent='View history';return;}
+  btn.textContent='Hide history';
+  wrap.innerHTML='<div class="history-panel"><div style="font-size:12px;color:#888">Loading history...</div></div>';
+  wrap.style.display='block';
+  try{
+    const d=await atGet('Sessions','?filterByFormula={ClosedOut}=1&sort[0][field]=Date&sort[0][direction]=desc&maxRecords=30');
+    if(!d.records||!d.records.length){
+      wrap.innerHTML='<div class="history-panel"><div style="font-size:12px;color:#888">No prior sessions found.</div></div>';
+      return;
+    }
+    let html='<div class="history-panel">';
+    d.records.forEach(rec=>{
+      let vt=[],vd=[];
+      try{vt=JSON.parse(rec.fields.Transfers||'[]').filter(r=>parseAmt(r.amt)>0&&r.from!==r.to);}catch(e){}
+      try{vd=JSON.parse(rec.fields.DepositsWithdrawals||'[]').filter(r=>parseAmt(r.amt)>0);}catch(e){}
+      const tTotal=vt.reduce((a,r)=>a+parseAmt(r.amt),0);
+      const dateStr=rec.fields.Date||'';
+      const date=dateStr?new Date(dateStr+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'}):rec.id;
+      html+=`<div class="history-item" onclick="viewHistoryRecord('${rec.id}')">
+        <div>
+          <div class="history-date">${date}</div>
+          <div class="history-meta">${vt.length} transfers &nbsp;·&nbsp; ${fmt(tTotal)} moved &nbsp;·&nbsp; ${vd.length} deposits/withdrawals</div>
+        </div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>`;
+    });
+    html+='</div>';
+    wrap.innerHTML=html;
+  }catch(e){wrap.innerHTML='<div class="history-panel"><div style="font-size:12px;color:#c00">Could not load history.</div></div>';}
+}
+
+async function viewHistoryRecord(id){
+  try{
+    const r=await fetch(`${AT_URL}/Sessions/${id}`,{headers:atHeaders()});
+    const rec=await r.json();
+    const f=rec.fields;
+    let vt=[],vd=[];
+    try{vt=JSON.parse(f.Transfers||'[]').filter(r=>parseAmt(r.amt)>0&&r.from!==r.to);}catch(e){}
+    try{vd=JSON.parse(f.DepositsWithdrawals||'[]').filter(r=>parseAmt(r.amt)>0);}catch(e){}
+    const tTotal=vt.reduce((a,r)=>a+parseAmt(r.amt),0);
+    const depTotal=vd.filter(r=>r.type==='deposit').reduce((a,r)=>a+parseAmt(r.amt),0);
+    const wdTotal=vd.filter(r=>r.type==='withdrawal').reduce((a,r)=>a+parseAmt(r.amt),0);
+    const dateStr=f.Date||'';
+    const date=dateStr?new Date(dateStr+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}):id;
+    const w=window.open('','_blank');
+    w.document.write(`<html><head><title>CMC Session ${date}</title>
+    <style>body{font-family:Arial,sans-serif;font-size:12px;padding:24px;color:#000}
+    h2{font-size:15px;margin-bottom:4px}h3{font-size:12px;font-weight:600;margin:14px 0 5px;color:#444}
+    p.sub{color:#666;font-size:11px;margin-bottom:14px}
+    table{width:100%;border-collapse:collapse;margin-bottom:8px}
+    th{font-size:11px;text-align:left;border-bottom:1px solid #ccc;padding:4px 6px;background:#f5f5f5}
+    td{padding:4px 6px;border-bottom:1px solid #eee;font-size:12px}
+    tfoot td{font-weight:bold;border-top:2px solid #ccc;border-bottom:none}
+    .stats{display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap}
+    .stat{background:#f5f5f5;padding:7px 12px;border-radius:4px}.stat span{display:block;font-size:10px;color:#666}.stat strong{font-size:13px}
+    .dep{color:#085041}.wd{color:#791F1F}
+    </style></head><body>
+    <h2>CMC Farming — Session Archive</h2>
+    <p class="sub">${date}</p>
+    <div class="stats">
+      <div class="stat"><span>Transfers</span><strong>${vt.length}</strong></div>
+      <div class="stat"><span>Total moved</span><strong>${fmt(tTotal)}</strong></div>
+      <div class="stat"><span>Deposits</span><strong class="dep">${fmt(depTotal)}</strong></div>
+      <div class="stat"><span>Withdrawals</span><strong class="wd">${fmt(wdTotal)}</strong></div>
+    </div>
+    ${vt.length?`<h3>Transfers</h3>
+    <table><thead><tr><th>#</th><th>From</th><th>To</th><th style="text-align:right">Amount</th><th>Note</th></tr></thead>
+    <tbody>${vt.map((r,i)=>`<tr><td>${i+1}</td><td>${r.from}</td><td>${r.to}</td><td style="text-align:right">${fmt(parseAmt(r.amt))}</td><td>${r.note||''}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="3">Total</td><td style="text-align:right">${fmt(tTotal)}</td><td></td></tr></tfoot></table>`:'<p style="color:#888">No transfers recorded.</p>'}
+    ${vd.length?`<h3>Deposits &amp; Withdrawals</h3>
+    <table><thead><tr><th>#</th><th>Account</th><th>Type</th><th style="text-align:right">Amount</th><th>Note</th></tr></thead>
+    <tbody>${vd.map((r,i)=>`<tr><td>${i+1}</td><td>${r.acct}</td><td class="${r.type==='deposit'?'dep':'wd'}">${r.type==='deposit'?'Deposit':'Withdrawal'}</td><td style="text-align:right">${fmt(parseAmt(r.amt))}</td><td>${r.note||''}</td></tr>`).join('')}</tbody></table>`:''}
+    </body></html>`);
+    w.document.close();
+  }catch(e){showToast('Could not load session');}
+}
+
+function fmt(n){
+  if(n<0)return'-$'+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  return'$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function fmtS(n){
+  const a=Math.abs(n);
+  let s=a>=1000000?'$'+(a/1000000).toFixed(2)+'M':a>=1000?'$'+(a/1000).toFixed(1)+'K':'$'+a.toFixed(0);
+  return n<0?'-'+s:s;
+}
+function parseAmt(raw){
+  const c=String(raw||'').replace(/[$,\s]/g,'');
+  const n=parseFloat(c);return isNaN(n)?0:n;
+}
+function sortedAccts(){
+  const order=a=>{const u=a.toUpperCase();if(u.startsWith('CBB'))return 0;if(u.startsWith('TC'))return 1;if(u.startsWith('FFB'))return 2;if(u.startsWith('MB'))return 3;return 4;};
+  return [...ACCTS].sort((a,b)=>order(a)-order(b)||a.localeCompare(b));
+}
+function buildOpts(sel){
+  return sortedAccts().map(a=>`<option value="${a}"${a===sel?' selected':''}>${a}</option>`).join('');
+}
+function attachAmtHandlers(el,obj){
+  el.addEventListener('input',function(){obj.amt=this.value;recalc();scheduleSave();});
+  el.addEventListener('blur',function(){
+    const v=parseAmt(this.value);
+    if(v>0){obj.amt=v;this.value=v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+    else{obj.amt='';this.value='';}
+    recalc();
+  });
+  el.addEventListener('focus',function(){if(obj.amt)this.value=parseAmt(obj.amt)||'';});
+}
+
+function renderTransferRow(r,num){
+  const tb=document.getElementById('transfer-body');
+  const tr=document.createElement('tr');tr.id='tt-'+r.id;
+  tr.innerHTML=`<td class="row-num">${num}</td>
+    <td><select class="sm" id="tf-${r.id}">${buildOpts(r.from)}</select></td>
+    <td><select class="sm" id="tt2-${r.id}">${buildOpts(r.to)}</select></td>
+    <td><input class="amt-field" type="text" inputmode="decimal" id="ta-${r.id}" placeholder="0" value="${r.amt?parseAmt(r.amt).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):''}"></td>
+    <td><input class="note-field" type="text" id="tn-${r.id}" value="${r.note||''}" placeholder=""></td>
+    <td><button class="del-btn">x</button></td>`;
+  tb.appendChild(tr);
+  document.getElementById('tf-'+r.id).addEventListener('change',function(){r.from=this.value;recalc();scheduleSave();});
+  document.getElementById('tt2-'+r.id).addEventListener('change',function(){r.to=this.value;recalc();scheduleSave();});
+  attachAmtHandlers(document.getElementById('ta-'+r.id),r);
+  document.getElementById('tn-'+r.id).addEventListener('input',function(){r.note=this.value;scheduleSave();});
+  tr.querySelector('.del-btn').addEventListener('click',()=>{
+    transfers=transfers.filter(x=>x.id!==r.id);tr.remove();
+    transfers.forEach((x,i)=>{const t=document.getElementById('tt-'+x.id);if(t)t.querySelector('.row-num').textContent=i+1;});
+    recalc();scheduleSave();
+  });
+}
+
+function addTransfer(){
+  const id=nextTid++;
+  const r={id,from:sortedAccts()[0]||'',to:sortedAccts()[1]||sortedAccts()[0]||'',amt:'',note:''};
+  transfers.push(r);
+  renderTransferRow(r,transfers.length);
+  recalc();
+  setTimeout(()=>{const el=document.getElementById('ta-'+id);if(el)el.focus();},50);
+}
+
+function renderDWRow(r,num){
+  const tb=document.getElementById('dw-body');
+  const tr=document.createElement('tr');tr.id='dw-'+r.id;
+  tr.innerHTML=`<td class="row-num">${num}</td>
+    <td><select class="sm" id="da-${r.id}">${buildOpts(r.acct)}</select></td>
+    <td><select class="sm" id="dt-${r.id}"><option value="deposit"${r.type==='deposit'?' selected':''}>Deposit</option><option value="withdrawal"${r.type==='withdrawal'?' selected':''}>Withdrawal</option></select></td>
+    <td><input class="amt-field" type="text" inputmode="decimal" id="damt-${r.id}" placeholder="0" value="${r.amt?parseAmt(r.amt).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):''}"></td>
+    <td><input class="note-field" type="text" id="dn-${r.id}" value="${r.note||''}" placeholder=""></td>
+    <td><button class="del-btn">x</button></td>`;
+  tb.appendChild(tr);
+  document.getElementById('da-'+r.id).addEventListener('change',function(){r.acct=this.value;recalc();scheduleSave();});
+  document.getElementById('dt-'+r.id).addEventListener('change',function(){r.type=this.value;recalc();scheduleSave();});
+  attachAmtHandlers(document.getElementById('damt-'+r.id),r);
+  document.getElementById('dn-'+r.id).addEventListener('input',function(){r.note=this.value;scheduleSave();});
+  tr.querySelector('.del-btn').addEventListener('click',()=>{
+    dwRows=dwRows.filter(x=>x.id!==r.id);tr.remove();
+    dwRows.forEach((x,i)=>{const t=document.getElementById('dw-'+x.id);if(t)t.querySelector('.row-num').textContent=i+1;});
+    recalc();scheduleSave();
+  });
+}
+
+function addDW(){
+  const id=nextDid++;
+  const r={id,acct:sortedAccts()[0]||'',type:'deposit',amt:'',note:''};
+  dwRows.push(r);
+  renderDWRow(r,dwRows.length);
+  recalc();
+  setTimeout(()=>{const el=document.getElementById('damt-'+id);if(el)el.focus();},50);
+}
+
+function getProj(){
+  const p={};
+  ACCTS.forEach(a=>p[a]=BALS[a]);
+  transfers.forEach(r=>{const amt=parseAmt(r.amt);if(amt>0&&r.from!==r.to){p[r.from]-=amt;p[r.to]+=amt;}});
+  dwRows.forEach(r=>{const amt=parseAmt(r.amt);if(amt>0&&r.acct){if(r.type==='deposit')p[r.acct]+=amt;else p[r.acct]-=amt;}});
+  return p;
+}
+
+function recalc(){
+  const proj=getProj();
+  transfers.forEach(r=>{
+    const tr=document.getElementById('tt-'+r.id);if(!tr)return;
+    const amt=parseAmt(r.amt);
+    tr.className=amt>0&&proj[r.from]<0?'warn-row':'';
+  });
+  dwRows.forEach(r=>{
+    const tr=document.getElementById('dw-'+r.id);if(!tr)return;
+    const amt=parseAmt(r.amt);
+    if(amt>0){tr.className=proj[r.acct]<0&&r.type==='withdrawal'?'warn-row':r.type==='deposit'?'dep-row':'wd-row';}
+    else tr.className='';
+  });
+  let tTotal=0,tCount=0,depTotal=0,wdTotal=0,flags=0;
+  transfers.forEach(r=>{const a=parseAmt(r.amt);if(a>0&&r.from!==r.to){tTotal+=a;tCount++;}});
+  dwRows.forEach(r=>{const a=parseAmt(r.amt);if(a>0){if(r.type==='deposit')depTotal+=a;else wdTotal+=a;}});
+  ACCTS.forEach(a=>{if(proj[a]<0){const covered=ZBA[a]&&(proj[ZBA[a]]+proj[a])>=0;if(!covered)flags++;}});
+  document.getElementById('s-count').textContent=tCount;
+  document.getElementById('s-total').textContent=fmtS(tTotal);
+  document.getElementById('s-deps').textContent=fmtS(depTotal);
+  document.getElementById('s-wds').textContent=fmtS(wdTotal);
+  const fEl=document.getElementById('s-flags');
+  fEl.textContent=flags;fEl.className='flags-val '+(flags>0?'warn':'ok');
+  renderBalPanel(proj);
+}
+
+function renderBalPanel(proj){
+  const groups={'CBB/TC':[],'FFB':[],'MB':[]};
+  ACCTS.forEach(a=>{const u=a.toUpperCase();if(u.startsWith('FFB'))groups['FFB'].push(a);else if(u.startsWith('MB'))groups['MB'].push(a);else groups['CBB/TC'].push(a);});
+  const colDefs=[{label:'CBB / TC',accounts:groups['CBB/TC']},{label:'FFB',accounts:groups['FFB']},{label:'MB',accounts:groups['MB']}];
+  const maxRows=Math.max(...colDefs.map(c=>c.accounts.length));
+  let html='<table style="width:100%;border-collapse:collapse"><thead>';
+  html+='<tr>'+colDefs.map((c,ci)=>`<th colspan="5" style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;padding:4px 6px 2px ${ci>0?'14px':'0'};border-bottom:1px solid #e5e5e0;text-align:left">${c.label}</th>`).join('')+'</tr>';
+  html+='<tr>'+colDefs.map((c,ci)=>`
+    <th colspan="3" style="padding-left:${ci>0?'14px':'0'};border-bottom:1px solid #e5e5e0"></th>
+    <th style="font-size:10px;font-weight:500;color:#888;padding:2px 4px 4px 0;border-bottom:1px solid #e5e5e0;text-align:right;white-space:nowrap">Today&#39;s balance</th>
+    <th style="font-size:10px;font-weight:500;color:#888;padding:2px 4px 4px 0;border-bottom:1px solid #e5e5e0;text-align:right;white-space:nowrap">Projected balance</th>
+  `).join('')+'</tr>';
+  html+='</thead><tbody>';
+  for(let i=0;i<maxRows;i++){
+    html+='<tr>';
+    colDefs.forEach((col,ci)=>{
+      const a=col.accounts[i];
+      if(a){
+        const orig=BALS[a],p=proj[a],hasDiff=Math.abs(p-orig)>0.005;
+        const isZBA=ZBA[a]!==undefined;
+        const parentProj=isZBA?proj[ZBA[a]]:null;
+        const covered=isZBA&&p<0&&parentProj!==null&&(parentProj+p)>=0;
+        const cls=p<0?(covered?'zba':'bad'):'ok';
+        const zbaTag=isZBA?`<span style="font-size:9px;background:#faeeda;color:#633806;border-radius:3px;padding:1px 4px;margin-left:4px">ZBA</span>`:'';
+        const coveredNote=covered?`<span style="font-size:9px;color:#854F0B;margin-left:3px">&#x2191; ${ZBA[a]}</span>`:'';
+        html+=`<td style="width:7px;padding-right:5px;padding-left:${ci>0?'14px':'0'}"><span class="flag ${cls}"></span></td>
+               <td style="font-size:11px;color:#1a1a1a;white-space:nowrap;padding-left:${isZBA?'4px':'0'}">${a}${zbaTag}</td>
+               <td style="font-size:9px;white-space:nowrap;color:#854F0B;padding-right:4px">${coveredNote}</td>
+               <td class="bal-orig" style="padding-right:4px;font-size:10px">${hasDiff?fmt(orig):''}</td>
+               <td class="bal-proj ${cls==='zba'?'zba-proj':cls}" style="padding-right:4px">${fmt(p)}</td>`;
+      } else {
+        html+=`<td colspan="5" style="padding-left:${ci>0?'14px':'0'}"></td>`;
+      }
+    });
+    html+='</tr>';
+  }
+  html+='</tbody></table>';
+  document.getElementById('bal-panel').innerHTML=html;
+}
+
+function showToast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2800);
+}
+function getValidTransfers(){return transfers.filter(r=>parseAmt(r.amt)>0&&r.from!==r.to);}
+function getValidDW(){return dwRows.filter(r=>parseAmt(r.amt)>0&&r.acct);}
+function getCSVLines(){
+  const date=new Date().toLocaleDateString('en-US');
+  const lines=['Date,#,From,To,Amount,Note'];
+  getValidTransfers().forEach((r,i)=>lines.push(`${date},${i+1},"${r.from}","${r.to}",${parseAmt(r.amt).toFixed(2)},"${r.note}"`));
+  return lines;
+}
+function exportCSV(){
+  const blob=new Blob([getCSVLines().join('\n')],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='CMC_transfers_'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(url);showToast('CSV downloaded');
+}
+function copyClipboard(){
+  navigator.clipboard.writeText(getCSVLines().map(l=>l.replace(/"/g,'')).join('\n')).then(()=>showToast('Copied to clipboard'));
+}
+function exportSummary(){
+  const proj=getProj();
+  const date=new Date().toLocaleDateString('en-US');
+  const vt=getValidTransfers(),vd=getValidDW();
+  const tTotal=vt.reduce((s,r)=>s+parseAmt(r.amt),0);
+  const depTotal=vd.filter(r=>r.type==='deposit').reduce((s,r)=>s+parseAmt(r.amt),0);
+  const wdTotal=vd.filter(r=>r.type==='withdrawal').reduce((s,r)=>s+parseAmt(r.amt),0);
+  const flagged=ACCTS.filter(a=>proj[a]<0&&!(ZBA[a]&&(proj[ZBA[a]]+proj[a])>=0));
+  let txt=`CMC SUMMARY — ${date}\n${'='.repeat(40)}\nTransfers: ${vt.length}  Moved: ${fmt(tTotal)}  Deposits: ${fmt(depTotal)}  Withdrawals: ${fmt(wdTotal)}\n`;
+  if(flagged.length)txt+=`\nFLAGGED:\n${flagged.map(a=>`  ${a}: ${fmt(proj[a])}`).join('\n')}\n`;
+  if(vt.length){txt+=`\nTRANSFERS:\n`;vt.forEach((r,i)=>{txt+=`  ${i+1}. ${r.from} → ${r.to}   ${fmt(parseAmt(r.amt))}${r.note?'  ('+r.note+')':''}\n`;});}
+  if(vd.length){txt+=`\nDEPOSITS & WITHDRAWALS:\n`;vd.forEach((r,i)=>{txt+=`  ${i+1}. ${r.type==='deposit'?'DEP':'WD '}  ${r.acct}   ${fmt(parseAmt(r.amt))}${r.note?'  ('+r.note+')':''}\n`;});}
+  navigator.clipboard.writeText(txt).then(()=>showToast('Summary copied'));
+}
+function printTransfers(){
+  const date=new Date().toLocaleDateString('en-US');
+  const vt=getValidTransfers(),vd=getValidDW();
+  const tTotal=vt.reduce((s,r)=>s+parseAmt(r.amt),0);
+  const depTotal=vd.filter(r=>r.type==='deposit').reduce((s,r)=>s+parseAmt(r.amt),0);
+  const wdTotal=vd.filter(r=>r.type==='withdrawal').reduce((s,r)=>s+parseAmt(r.amt),0);
+  const w=window.open('','_blank');
+  w.document.write(`<html><head><title>CMC Transfers ${date}</title>
+  <style>body{font-family:Arial,sans-serif;font-size:12px;padding:24px;color:#000}
+  h2{font-size:15px;margin-bottom:4px}h3{font-size:12px;font-weight:600;margin:14px 0 5px;color:#444}
+  p.sub{color:#666;font-size:11px;margin-bottom:14px}
+  table{width:100%;border-collapse:collapse;margin-bottom:8px}
+  th{font-size:11px;text-align:left;border-bottom:1px solid #ccc;padding:4px 6px;background:#f5f5f5}
+  td{padding:4px 6px;border-bottom:1px solid #eee;font-size:12px}
+  tfoot td{font-weight:bold;border-top:2px solid #ccc;border-bottom:none}
+  .stats{display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap}
+  .stat{background:#f5f5f5;padding:7px 12px;border-radius:4px}.stat span{display:block;font-size:10px;color:#666}.stat strong{font-size:13px}
+  .dep{color:#085041}.wd{color:#791F1F}
+  </style></head><body>
+  <h2>CMC Farming — Transfer Log</h2>
+  <p class="sub">${date} &nbsp;|&nbsp; Printed ${new Date().toLocaleTimeString()}</p>
+  <div class="stats">
+    <div class="stat"><span>Transfers</span><strong>${vt.length}</strong></div>
+    <div class="stat"><span>Total moved</span><strong>${fmt(tTotal)}</strong></div>
+    <div class="stat"><span>Deposits</span><strong class="dep">${fmt(depTotal)}</strong></div>
+    <div class="stat"><span>Withdrawals</span><strong class="wd">${fmt(wdTotal)}</strong></div>
+  </div>
+  ${vt.length?`<h3>Transfers</h3>
+  <table><thead><tr><th>#</th><th>From</th><th>To</th><th style="text-align:right">Amount</th><th>Note</th></tr></thead>
+  <tbody>${vt.map((r,i)=>`<tr><td>${i+1}</td><td>${r.from}</td><td>${r.to}</td><td style="text-align:right">${fmt(parseAmt(r.amt))}</td><td>${r.note||''}</td></tr>`).join('')}</tbody>
+  <tfoot><tr><td colspan="3">Total</td><td style="text-align:right">${fmt(tTotal)}</td><td></td></tr></tfoot></table>`:''}
+  ${vd.length?`<h3>Deposits &amp; Withdrawals</h3>
+  <table><thead><tr><th>#</th><th>Account</th><th>Type</th><th style="text-align:right">Amount</th><th>Note</th></tr></thead>
+  <tbody>${vd.map((r,i)=>`<tr><td>${i+1}</td><td>${r.acct}</td><td class="${r.type==='deposit'?'dep':'wd'}">${r.type==='deposit'?'Deposit':'Withdrawal'}</td><td style="text-align:right">${fmt(parseAmt(r.amt))}</td><td>${r.note||''}</td></tr>`).join('')}</tbody>
+  <tfoot><tr><td colspan="2"></td><td class="dep">Deposits</td><td style="text-align:right" class="dep">${fmt(depTotal)}</td><td></td></tr>
+  <tr><td colspan="2"></td><td class="wd">Withdrawals</td><td style="text-align:right" class="wd">${fmt(wdTotal)}</td><td></td></tr></tfoot></table>`:''}
+  </body></html>`);
+  w.document.close();w.print();
+}
+function printView(){
+  const proj=getProj();
+  const date=new Date().toLocaleDateString('en-US');
+  const vt=getValidTransfers(),vd=getValidDW();
+  const tTotal=vt.reduce((s,r)=>s+parseAmt(r.amt),0);
+  const depTotal=vd.filter(r=>r.type==='deposit').reduce((s,r)=>s+parseAmt(r.amt),0);
+  const wdTotal=vd.filter(r=>r.type==='withdrawal').reduce((s,r)=>s+parseAmt(r.amt),0);
+  const flagged=ACCTS.filter(a=>proj[a]<0&&!(ZBA[a]&&(proj[ZBA[a]]+proj[a])>=0));
+  const w=window.open('','_blank');
+  w.document.write(`<html><head><title>CMC Full Report ${date}</title>
+  <style>body{font-family:Arial,sans-serif;font-size:12px;padding:24px;color:#000}
+  h2{font-size:15px;margin-bottom:4px}h3{font-size:12px;font-weight:600;margin:14px 0 5px;color:#444}
+  p.sub{color:#666;font-size:11px;margin-bottom:14px}
+  table{width:100%;border-collapse:collapse;margin-bottom:8px}
+  th{font-size:11px;text-align:left;border-bottom:1px solid #ccc;padding:4px 6px;background:#f5f5f5}
+  td{padding:4px 6px;border-bottom:1px solid #eee;font-size:12px}
+  tfoot td{font-weight:bold;border-top:2px solid #ccc;border-bottom:none}
+  .stats{display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap}
+  .stat{background:#f5f5f5;padding:7px 12px;border-radius:4px}.stat span{display:block;font-size:10px;color:#666}.stat strong{font-size:13px}
+  .dep{color:#085041}.wd{color:#791F1F}.flagged{color:#c00}
+  .zba-tag{font-size:9px;background:#faeeda;color:#633806;border-radius:3px;padding:1px 4px;margin-left:4px}
+  </style></head><body>
+  <h2>CMC Farming — Transfers &amp; Bank Balances</h2>
+  <p class="sub">${date} &nbsp;|&nbsp; Printed ${new Date().toLocaleTimeString()}</p>
+  <div class="stats">
+    <div class="stat"><span>Transfers</span><strong>${vt.length}</strong></div>
+    <div class="stat"><span>Total moved</span><strong>${fmt(tTotal)}</strong></div>
+    <div class="stat"><span>Deposits</span><strong class="dep">${fmt(depTotal)}</strong></div>
+    <div class="stat"><span>Withdrawals</span><strong class="wd">${fmt(wdTotal)}</strong></div>
+    <div class="stat"><span>Flagged</span><strong class="${flagged.length?'flagged':''}">${flagged.length}</strong></div>
+  </div>
+  ${flagged.length?`<p class="flagged" style="margin-bottom:10px">Flagged: ${flagged.map(a=>`${a} (${fmt(proj[a])})`).join(', ')}</p>`:''}
+  ${vt.length?`<h3>Transfers</h3>
+  <table><thead><tr><th>#</th><th>From</th><th>To</th><th style="text-align:right">Amount</th><th>Note</th></tr></thead>
+  <tbody>${vt.map((r,i)=>`<tr><td>${i+1}</td><td>${r.from}</td><td>${r.to}</td><td style="text-align:right">${fmt(parseAmt(r.amt))}</td><td>${r.note||''}</td></tr>`).join('')}</tbody>
+  <tfoot><tr><td colspan="3">Total</td><td style="text-align:right">${fmt(tTotal)}</td><td></td></tr></tfoot></table>`:''}
+  ${vd.length?`<h3>Deposits &amp; Withdrawals</h3>
+  <table><thead><tr><th>#</th><th>Account</th><th>Type</th><th style="text-align:right">Amount</th><th>Note</th></tr></thead>
+  <tbody>${vd.map((r,i)=>`<tr><td>${i+1}</td><td>${r.acct}</td><td class="${r.type==='deposit'?'dep':'wd'}">${r.type==='deposit'?'Deposit':'Withdrawal'}</td><td style="text-align:right">${fmt(parseAmt(r.amt))}</td><td>${r.note||''}</td></tr>`).join('')}</tbody>
+  <tfoot><tr><td colspan="2"></td><td class="dep">Deposits</td><td style="text-align:right" class="dep">${fmt(depTotal)}</td><td></td></tr>
+  <tr><td colspan="2"></td><td class="wd">Withdrawals</td><td style="text-align:right" class="wd">${fmt(wdTotal)}</td><td></td></tr></tfoot></table>`:''}
+  <h3>Running balances</h3>
+  ${(()=>{
+    const groups={'CBB/TC':[],'FFB':[],'MB':[]};
+    sortedAccts().forEach(a=>{const u=a.toUpperCase();if(u.startsWith('FFB'))groups['FFB'].push(a);else if(u.startsWith('MB'))groups['MB'].push(a);else groups['CBB/TC'].push(a);});
+    const colDefs=[{label:'CBB / TC',accounts:groups['CBB/TC']},{label:'FFB',accounts:groups['FFB']},{label:'MB',accounts:groups['MB']}];
+    const maxRows=Math.max(...colDefs.map(c=>c.accounts.length));
+    let t='<table style="width:100%;border-collapse:collapse"><thead><tr>';
+    colDefs.forEach((c,ci)=>{t+=`<th colspan="3" style="font-size:11px;font-weight:600;text-align:left;border-bottom:1px solid #ccc;padding:4px 6px 4px ${ci>0?'14px':'4px'};background:#f5f5f5">${c.label}</th>`;});
+    t+='</tr></thead><tbody>';
+    for(let i=0;i<maxRows;i++){
+      t+='<tr>';
+      colDefs.forEach((col,ci)=>{
+        const a=col.accounts[i];
+        if(a){
+          const p=proj[a];
+          const isZBA=ZBA[a]!==undefined;
+          const covered=isZBA&&p<0&&proj[ZBA[a]]!==undefined&&(proj[ZBA[a]]+p)>=0;
+          const color=p>=0?'#060':covered?'#854F0B':'#c00';
+          const zbaTag=isZBA?`<span style="font-size:9px;background:#faeeda;color:#633806;border-radius:3px;padding:1px 4px;margin-left:3px">ZBA</span>`:'';
+          t+=`<td style="font-size:11px;padding:3px 4px 3px ${ci>0?'14px':'4px'};border-bottom:1px solid #eee;white-space:nowrap">${a}${zbaTag}</td>
+              <td style="font-size:11px;text-align:right;padding:3px 4px;border-bottom:1px solid #eee;color:${color};font-weight:${p<0?'600':'400'};white-space:nowrap">${fmt(p)}</td>
+              <td style="font-size:10px;padding:3px 8px 3px 4px;border-bottom:1px solid #eee;color:${color};white-space:nowrap">${p>=0?'OK':covered?'ZBA covered':'NEGATIVE'}</td>`;
+        } else {
+          t+=`<td colspan="3" style="padding-left:${ci>0?'14px':'4px'};border-bottom:1px solid #eee"></td>`;
+        }
+      });
+      t+='</tr>';
+    }
+    t+='</tbody></table>';
+    return t;
+  })()}
+  </body></html>`);
+  w.document.close();w.print();
+}
+</script>
+</body>
+</html>
