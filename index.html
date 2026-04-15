@@ -258,18 +258,30 @@ async function loadSession(){
     if(d.records&&d.records.length>0){
       const rec=d.records[0];
       sessionRecordId=rec.id;
-      try{transfers=JSON.parse(rec.fields.Transfers||'[]');}catch(e){transfers=[];}
-      try{dwRows=JSON.parse(rec.fields.DepositsWithdrawals||'[]');}catch(e){dwRows=[];}
-      nextTid=transfers.length>0?Math.max(...transfers.map(r=>r.id))+1:1;
-      nextDid=dwRows.length>0?Math.max(...dwRows.map(r=>r.id))+1:1;
-      transfers.forEach((r,i)=>renderTransferRow(r,i+1));
-      dwRows.forEach((r,i)=>renderDWRow(r,i+1));
-      recalc();
-      if(transfers.length>0||dwRows.length>0)showToast('Session restored — '+transfers.length+' transfers, '+dwRows.length+' deposits/withdrawals');
+      try{ACCTS=JSON.parse(rec.fields.Accounts||'[]');}catch(e){ACCTS=[];}
+      try{BALS=JSON.parse(rec.fields.Balances||'{}');}catch(e){BALS={};}
+      if(ACCTS.length>0){
+        try{transfers=JSON.parse(rec.fields.Transfers||'[]');}catch(e){transfers=[];}
+        try{dwRows=JSON.parse(rec.fields.DepositsWithdrawals||'[]');}catch(e){dwRows=[];}
+        nextTid=transfers.length>0?Math.max(...transfers.map(r=>r.id))+1:1;
+        nextDid=dwRows.length>0?Math.max(...dwRows.map(r=>r.id))+1:1;
+        document.getElementById('upload-section').style.display='none';
+        document.getElementById('main-section').style.display='block';
+        document.getElementById('loaded-bar-wrap').innerHTML=`<div class="loaded-bar"><span>Session restored — <strong>${ACCTS.length} accounts</strong></span><button onclick="resetUpload()">Upload new file</button></div>`;
+        transfers.forEach((r,i)=>renderTransferRow(r,i+1));
+        dwRows.forEach((r,i)=>renderDWRow(r,i+1));
+        recalc();
+        if(transfers.length>0||dwRows.length>0)showToast('Session restored — '+transfers.length+' transfers, '+dwRows.length+' deposits/withdrawals');
+      }
     }
     setSaveIndicator('');
   }catch(e){setSaveIndicator('error');}
 }
+
+document.addEventListener('DOMContentLoaded',async function(){
+  document.getElementById('upload-section').style.display='block';
+  await loadSession();
+});
 
 function scheduleSave(){
   setSaveIndicator('saving');
